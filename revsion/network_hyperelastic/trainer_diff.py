@@ -12,6 +12,7 @@ from net_b import *
 from torch.utils.tensorboard import SummaryWriter
 import time
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 train_list = np.load("./train_list_nn_90.npy",allow_pickle=True)
 #replace ./ with ../
@@ -28,9 +29,9 @@ train_loader=DataLoader(dataset_train,batch_size=batch_size,shuffle=True,num_wor
 
 epochs=1000
 
-diff=GaussianDiffusion(Unet(dim=64,dim_mults=(1,1,2,2,4)),image_size=64,p2_loss_weight_k=0,timesteps=500,loss_type="l1").to("cuda:0")
-
-diff=nn.DataParallel(diff,device_ids=[0,1,2])
+diff=GaussianDiffusion(Unet(dim=64,dim_mults=(1,1,2,2,4)),image_size=64,p2_loss_weight_k=0,timesteps=500,loss_type="l1").to(device)
+if torch.cuda.device_count() > 1:
+    diff=nn.DataParallel(diff)
 
 optimizer=optim.Adam(diff.parameters(),lr=1e-3)#1e-3
 scheduler=torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,patience=25,factor=0.75,threshold=0.001, verbose=True,min_lr=1e-8)
@@ -67,11 +68,11 @@ for epoch in (range(epoch_done,epochs)):
     l_sc=[]
 
     for inputs,targets,target_n,mx,mn,stack,fs in tqdm(train_loader):
-        inputs=inputs.to("cuda:0").float()
-        targets=targets.to("cuda:0").float()
-        target_n=target_n.to("cuda:0").float()
+        inputs=inputs.to(device, non_blocking=True).float()
+        targets=targets.to(device, non_blocking=True).float()
+        target_n=target_n.to(device, non_blocking=True).float()
         
-        stack=stack.to("cuda:0")
+        stack=stack.to(device, non_blocking=True)
 
         optimizer.zero_grad()
 
@@ -92,6 +93,5 @@ for epoch in (range(epoch_done,epochs)):
 
 
     # torch.save({'epoch': epoch,"model_state_dict":diff.state_dict(),'optimizer_state_dict': optimizer.state_dict(),'loss': loss,"scheduler_state_dict":scheduler.state_dict()}, "./models/"+name+".pth")
-
 
 

@@ -18,6 +18,7 @@ from vit_min_max import *
 import torch.nn.init as init
 from collections import OrderedDict
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 train_list = np.load("./train_list_nn_90.npy",allow_pickle=True)
 #replace ./ with ../
@@ -43,7 +44,7 @@ print("Training:"+name)
 
 # net=VisionTransformer(embed_dim=256,hidden_dim=512,num_heads=8,num_layers=6,num_channels=5,patch_size=2,num_patches=256).to("cuda:0") 
 
-net=VisionTransformer(embed_dim=256,hidden_dim=512,num_heads=8,num_layers=16,num_channels=2,patch_size=4,num_patches=256).to("cuda:0") 
+net=VisionTransformer(embed_dim=256,hidden_dim=512,num_heads=8,num_layers=16,num_channels=2,patch_size=4,num_patches=256).to(device) 
 
 for m in net.modules():
     if isinstance(m, nn.Linear) or isinstance(m, nn.Bilinear):
@@ -78,7 +79,8 @@ epoch_done=0
 # loss=loaded_model["loss"]
 # print("Loaded model from epoch: ",epoch_done,"Loss: ",loss)
 
-net=nn.DataParallel(net,device_ids=[0,1,2])
+if torch.cuda.device_count() > 1:
+    net=nn.DataParallel(net)
 
 l1loss=nn.L1Loss(reduction="mean")
 mse=nn.MSELoss(reduction="mean")
@@ -94,10 +96,10 @@ for epoch in range(epoch_done,epochs):
 
     for inputs,targets,targets_n,maxx,minn, stack,f_s in tqdm(train_loader):
         
-        inputs=inputs.to("cuda:0").float()
-        stack=stack.to("cuda:0").float()
+        inputs=inputs.to(device, non_blocking=True).float()
+        stack=stack.to(device, non_blocking=True).float()
 
-        f_s=f_s.to("cuda:0").float()
+        f_s=f_s.to(device, non_blocking=True).float()
 
         outputs=net(inputs,f_s)
 
@@ -134,10 +136,10 @@ for epoch in range(epoch_done,epochs):
             ll_t=[]
             for inputs,targets,targets_n,maxx,minn,stack,f_s in tqdm(test_loader):
                 
-                inputs=inputs.to("cuda:0").float()
-                stack=stack.to("cuda:0").float()
+                inputs=inputs.to(device, non_blocking=True).float()
+                stack=stack.to(device, non_blocking=True).float()
 
-                f_s=f_s.to("cuda:0").float()
+                f_s=f_s.to(device, non_blocking=True).float()
 
                 outputs=net(inputs,f_s)
 
